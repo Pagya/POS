@@ -1,4 +1,4 @@
-# Commerce OS — MVP
+# Commerce OS — MVP 🚀
 
 A multi-tenant Commerce Operating System: POS + Order Management + Feedback Intelligence.
 
