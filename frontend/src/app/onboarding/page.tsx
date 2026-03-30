@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { setSession, getUser, getToken } from '@/lib/auth';
+import { setSession } from '@/lib/auth';
 
 const TYPES = [
-  { value: 'restaurant', label: '🍽️ Restaurant', desc: 'Dine-in, takeaway, billing' },
-  { value: 'retail',     label: '🛍️ Retail',     desc: 'Physical store, POS' },
-  { value: 'ecommerce',  label: '📦 D2C / Ecommerce', desc: 'Online orders' },
-  { value: 'service',    label: '🔧 Service',    desc: 'Consultations, repairs' },
+  { value: 'restaurant', emoji: '🍽️', label: 'Restaurant', desc: 'Dine-in, takeaway' },
+  { value: 'retail',     emoji: '🛍️', label: 'Retail',     desc: 'Physical store, POS' },
+  { value: 'ecommerce',  emoji: '📦', label: 'D2C / Online', desc: 'Online orders' },
+  { value: 'service',    emoji: '🔧', label: 'Service',    desc: 'Consultations, repairs' },
 ];
 
 export default function OnboardingPage() {
@@ -16,10 +16,12 @@ export default function OnboardingPage() {
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!type) return setError('Select a business type');
+    if (!type) return setError('Please select a business type');
+    setLoading(true);
     try {
       const { data } = await api.post('/businesses', { name, type });
       const token = localStorage.getItem('token')!;
@@ -28,43 +30,59 @@ export default function OnboardingPage() {
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create business');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: 480 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Set up your business</h1>
-        <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 24 }}>This takes 30 seconds.</p>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className="card" style={{ width: '100%', maxWidth: 520, padding: 36 }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🍽️</div>
+          <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-.5px' }}>Set up your business</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 6 }}>Takes less than a minute. No credit card needed.</p>
+        </div>
 
         <form onSubmit={submit}>
           <div className="form-group">
             <label>Business Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Chai Corner" required />
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Chai Corner, The Spice Route..."
+              required
+              style={{ fontSize: 16, padding: '12px 16px' }}
+            />
           </div>
 
           <div className="form-group">
             <label>Business Type</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
+            <div className="type-grid">
               {TYPES.map(t => (
                 <div
                   key={t.value}
+                  className={`type-card ${type === t.value ? 'selected' : ''}`}
                   onClick={() => setType(t.value)}
-                  style={{
-                    border: `2px solid ${type === t.value ? '#4f46e5' : '#e5e7eb'}`,
-                    borderRadius: 8, padding: 12, cursor: 'pointer',
-                    background: type === t.value ? '#eef2ff' : '#fff',
-                  }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{t.desc}</div>
+                  <div className="type-emoji">{t.emoji}</div>
+                  <div className="type-label">{t.label}</div>
+                  <div className="type-desc">{t.desc}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {error && <p className="error">{error}</p>}
-          <button className="btn-primary" style={{ width: '100%', marginTop: 8 }}>Launch my Commerce OS</button>
+
+          <button
+            className="btn-primary"
+            style={{ width: '100%', padding: '14px', fontSize: 15, marginTop: 8 }}
+            disabled={loading}
+          >
+            {loading ? 'Setting up...' : '🚀 Launch my Commerce OS'}
+          </button>
         </form>
       </div>
     </div>

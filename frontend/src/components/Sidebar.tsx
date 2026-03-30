@@ -4,11 +4,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { clearSession, getBusiness } from '@/lib/auth';
 
 const NAV = [
-  { href: '/dashboard', label: '📊 Dashboard' },
-  { href: '/pos',       label: '🧾 POS' },
-  { href: '/orders',    label: '📋 Orders' },
-  { href: '/items',     label: '📦 Catalog' },
-  { href: '/feedback',  label: '⭐ Feedback' },
+  { href: '/dashboard', icon: '📊', label: 'Dashboard' },
+  { href: '/pos',       icon: '🧾', label: 'POS Billing' },
+  { href: '/orders',    icon: '📋', label: 'Orders' },
+  { href: '/items',     icon: '📦', label: 'Catalog' },
+  { href: '/feedback',  icon: '⭐', label: 'Feedback' },
 ];
 
 export default function Sidebar() {
@@ -20,34 +20,50 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="logo">Commerce OS</div>
+      {/* Logo */}
+      <div className="sidebar-logo">
+        <div className="logo-icon">🍽️</div>
+        <div>
+          <div className="logo-text">Commerce OS</div>
+          <div className="logo-sub">Powered by Swiggy-style UX</div>
+        </div>
+      </div>
+
+      {/* Business info */}
       {business && (
-        <div style={{ padding: '0 20px 16px', fontSize: 12, color: '#64748b' }}>
-          {business.name}
-          <span style={{ marginLeft: 6, background: '#2d2d4e', padding: '2px 6px', borderRadius: 4, fontSize: 10 }}>
-            {business.type}
-          </span>
+        <div className="sidebar-business">
+          <div className="biz-name">{business.name}</div>
+          <span className="biz-type">{business.type}</span>
         </div>
       )}
+
+      {/* Nav */}
       <nav>
         {NAV.map(n => (
-          <Link key={n.href} href={n.href} className={pathname.startsWith(n.href) ? 'active' : ''}>
+          <Link
+            key={n.href}
+            href={n.href}
+            className={pathname.startsWith(n.href) ? 'active' : ''}
+          >
+            <span className="nav-icon">{n.icon}</span>
             {n.label}
           </Link>
         ))}
         {business && (
-          <a
-            href={`/store/${business.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginTop: 8 }}
-          >
-            🔗 Public Page
+          <a href={`/store/${business.slug}`} target="_blank" rel="noreferrer">
+            <span className="nav-icon">🔗</span>
+            Public Store
           </a>
         )}
       </nav>
-      <div style={{ position: 'absolute', bottom: 20, left: 0, right: 0, padding: '0 20px' }}>
-        <button className="btn-ghost" style={{ width: '100%', color: '#94a3b8' }} onClick={logout}>
+
+      {/* Footer */}
+      <div className="sidebar-footer">
+        <button
+          className="btn-ghost"
+          style={{ width: '100%', color: '#9ca3af', borderColor: '#333', fontSize: 13 }}
+          onClick={logout}
+        >
           Sign out
         </button>
       </div>

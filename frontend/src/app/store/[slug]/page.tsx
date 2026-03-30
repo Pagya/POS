@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '@/lib/api';
 
 interface CartItem { item_id: string; name: string; price: number; quantity: number; }
@@ -7,7 +7,6 @@ interface CartItem { item_id: string; name: string; price: number; quantity: num
 export default function StorePage({ params }: { params: { slug: string } }) {
   const [store, setStore] = useState<any>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [showCart, setShowCart] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [completedOrderId, setCompletedOrderId] = useState('');
@@ -15,9 +14,13 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const [feedback, setFeedback] = useState({ rating: 0, comment: '' });
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [activeCategory, setActiveCategory] = useState('');
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
-    api.get(`/public/${params.slug}`).then(r => setStore(r.data)).catch(() => setStore(null));
+    api.get(`/public/${params.slug}`).then(r => {
+      setStore(r.data);
+    }).catch(() => setStore(null));
   }, [params.slug]);
 
   const addToCart = (item: any) => {
@@ -48,7 +51,7 @@ export default function StorePage({ params }: { params: { slug: string } }) {
       });
       setCart([]);
       setShowCheckout(false);
-      setSuccess('Order placed! We\'ll get it ready for you.');
+      setSuccess('Order placed successfully!');
       setCompletedOrderId(data.id);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to place order');
@@ -61,67 +64,155 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     try {
       await api.post('/feedback', { order_id: completedOrderId, rating: feedback.rating, comment: feedback.comment });
       setShowFeedback(false);
-      setSuccess('Thanks for your feedback!');
+      setSuccess('Thanks for your feedback! 🙏');
+      setCompletedOrderId('');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Could not submit feedback');
     }
   };
 
+  const scrollToCategory = (cat: string) => {
+    setActiveCategory(cat);
+    categoryRefs.current[cat]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   // Group items by category
   const grouped: Record<string, any[]> = {};
   store?.items?.forEach((item: any) => {
-    const cat = item.category || 'Other';
+    const cat = item.category || 'Menu';
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(item);
   });
+  const categoryNames = Object.keys(grouped);
 
-  if (!store) return <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Store not found.</div>;
+  if (store === null) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 48 }}>🔍</div>
+      <p style={{ fontWeight: 700, fontSize: 18 }}>Store not found</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Check the URL and try again</p>
+    </div>
+  );
+
+  if (!store) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
+        <p>Loading store...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="public-page">
-      <div className="public-header">
-        <h1>{store.business.name}</h1>
-        <p>{store.business.type}</p>
-      </div>
-
-      {success && (
-        <div style={{ background: '#d1fae5', color: '#065f46', padding: '12px 16px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
-          {success}
-          {completedOrderId && !showFeedback && (
-            <button
-              onClick={() => setShowFeedback(true)}
-              style={{ marginLeft: 12, background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}
-            >
-              Leave Feedback
-            </button>
-          )}
+    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <div className="public-page">
+        {/* Hero */}
+        <div className="public-hero">
+          <h1>{store.business.name}</h1>
+          <p>Order online · Fast delivery</p>
+          <div className="hero-badge">
+            {store.business.type === 'restaurant' ? '🍽️ Restaurant' :
+             store.business.type === 'retail' ? '🛍️ Retail Store' :
+             store.business.type === 'ecommerce' ? '📦 Online Store' : '🔧 Service'}
+          </div>
         </div>
-      )}
 
-      {Object.entries(grouped).map(([cat, catItems]) => (
-        <div key={cat} className="category-section">
-          <h2>{cat}</h2>
-          {catItems.map(item => (
-            <div key={item.id} className="public-item">
-              <div className="info">
-                <div className="name">{item.name}</div>
-                <div className="price">₹{Number(item.price).toLocaleString()}</div>
-              </div>
+        {/* Success banner */}
+        {success && (
+          <div style={{ background: '#E8F5E9', color: '#2E7D32', padding: '14px 24px', fontSize: 14, fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>✅ {success}</span>
+            {completedOrderId && (
               <button
-                className="btn-primary btn-sm"
-                onClick={() => addToCart(item)}
-                disabled={!item.available}
+                onClick={() => setShowFeedback(true)}
+                style={{ background: '#2E7D32', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
               >
-                {cart.find(c => c.item_id === item.id) ? `+1 (${cart.find(c => c.item_id === item.id)?.quantity})` : 'Add'}
+                Rate your experience ⭐
               </button>
+            )}
+          </div>
+        )}
+
+        {/* Category nav */}
+        {categoryNames.length > 1 && (
+          <div className="public-nav">
+            {categoryNames.map(cat => (
+              <a
+                key={cat}
+                className={activeCategory === cat ? 'active' : ''}
+                onClick={() => scrollToCategory(cat)}
+                style={{ cursor: 'pointer' }}
+              >
+                {cat}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Items */}
+        <div className="public-content">
+          {categoryNames.map(cat => (
+            <div
+              key={cat}
+              className="category-section"
+              ref={el => { categoryRefs.current[cat] = el; }}
+            >
+              <h2>{cat}</h2>
+              {grouped[cat].map(item => {
+                const inCart = cart.find(c => c.item_id === item.id);
+                return (
+                  <div key={item.id} className="public-item">
+                    <div className="info">
+                      <div style={{ marginBottom: 4 }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: 14, height: 14,
+                          border: '1.5px solid var(--green)',
+                          borderRadius: 2,
+                          verticalAlign: 'middle',
+                          marginRight: 6,
+                          position: 'relative',
+                        }}>
+                          <span style={{
+                            position: 'absolute', top: '50%', left: '50%',
+                            transform: 'translate(-50%,-50%)',
+                            width: 7, height: 7,
+                            background: 'var(--green)',
+                            borderRadius: '50%',
+                            display: 'block',
+                          }} />
+                        </span>
+                      </div>
+                      <div className="name">{item.name}</div>
+                      <div className="price">₹{Number(item.price).toLocaleString()}</div>
+                    </div>
+                    <div className="add-btn-wrap">
+                      {inCart ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1.5px solid var(--orange)', borderRadius: 8, padding: '4px 8px', background: '#fff' }}>
+                          <button className="qty-btn" style={{ border: 'none', background: 'transparent', color: 'var(--orange)' }} onClick={() => updateQty(item.id, -1)}>−</button>
+                          <span style={{ fontWeight: 700, minWidth: 16, textAlign: 'center', color: 'var(--orange)' }}>{inCart.quantity}</span>
+                          <button className="qty-btn" style={{ border: 'none', background: 'transparent', color: 'var(--orange)' }} onClick={() => updateQty(item.id, 1)}>+</button>
+                        </div>
+                      ) : (
+                        <button className="add-btn" onClick={() => addToCart(item)} disabled={!item.available}>
+                          {item.available ? 'ADD' : 'Sold out'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
-      ))}
+      </div>
 
+      {/* Cart FAB */}
       {cartCount > 0 && (
         <button className="cart-fab" onClick={() => setShowCheckout(true)}>
-          🛒 {cartCount} items · ₹{cartTotal.toLocaleString()}
+          <div className="fab-left">
+            <span className="fab-count">{cartCount}</span>
+            <span>View Cart</span>
+          </div>
+          <span>₹{cartTotal.toLocaleString()} →</span>
         </button>
       )}
 
@@ -129,33 +220,38 @@ export default function StorePage({ params }: { params: { slug: string } }) {
       {showCheckout && (
         <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Your Order</h2>
+            <div className="modal-handle" />
+            <h2>Your Cart</h2>
+
             {cart.map(c => (
-              <div key={c.item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 }}>
-                <span>{c.name}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={c.item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f5f5f5', fontSize: 14 }}>
+                <span style={{ fontWeight: 600, flex: 1 }}>{c.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button className="qty-btn" onClick={() => updateQty(c.item_id, -1)}>−</button>
-                  <span>{c.quantity}</span>
+                  <span style={{ fontWeight: 700 }}>{c.quantity}</span>
                   <button className="qty-btn" onClick={() => updateQty(c.item_id, 1)}>+</button>
-                  <span style={{ minWidth: 60, textAlign: 'right' }}>₹{(c.price * c.quantity).toLocaleString()}</span>
+                  <span style={{ minWidth: 64, textAlign: 'right', fontWeight: 700 }}>₹{(c.price * c.quantity).toLocaleString()}</span>
                 </div>
               </div>
             ))}
-            <div style={{ fontWeight: 700, fontSize: 16, margin: '12px 0', borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
-              Total: ₹{cartTotal.toLocaleString()}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 17, margin: '16px 0', color: 'var(--text)' }}>
+              <span>Total</span>
+              <span style={{ color: 'var(--orange)' }}>₹{cartTotal.toLocaleString()}</span>
             </div>
+
             <form onSubmit={placeOrder}>
               <div className="form-group">
                 <label>Your Name</label>
-                <input value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} required />
+                <input value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} placeholder="Enter your name" required />
               </div>
               <div className="form-group">
-                <label>Phone</label>
-                <input value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} required />
+                <label>Phone Number</label>
+                <input value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} placeholder="10-digit mobile number" required />
               </div>
               {error && <p className="error">{error}</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn-primary" style={{ flex: 1 }}>Place Order</button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <button className="btn-primary" style={{ flex: 1, padding: '13px', fontSize: 15 }}>Place Order →</button>
                 <button type="button" className="btn-ghost" onClick={() => setShowCheckout(false)}>Cancel</button>
               </div>
             </form>
@@ -167,9 +263,11 @@ export default function StorePage({ params }: { params: { slug: string } }) {
       {showFeedback && (
         <div className="modal-overlay" onClick={() => setShowFeedback(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>How was your experience?</h2>
+            <div className="modal-handle" />
+            <h2>How was your experience? 😊</h2>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>Your feedback helps us improve</p>
             <form onSubmit={submitFeedback}>
-              <div className="stars" style={{ marginBottom: 16 }}>
+              <div className="stars" style={{ marginBottom: 20, justifyContent: 'center' }}>
                 {[1, 2, 3, 4, 5].map(n => (
                   <span
                     key={n}
@@ -179,12 +277,12 @@ export default function StorePage({ params }: { params: { slug: string } }) {
                 ))}
               </div>
               <div className="form-group">
-                <label>Comment (optional)</label>
-                <textarea rows={3} value={feedback.comment} onChange={e => setFeedback({ ...feedback, comment: e.target.value })} />
+                <label>Tell us more (optional)</label>
+                <textarea rows={3} value={feedback.comment} onChange={e => setFeedback({ ...feedback, comment: e.target.value })} placeholder="What did you love? What can we improve?" />
               </div>
               {error && <p className="error">{error}</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn-primary" style={{ flex: 1 }}>Submit</button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-primary" style={{ flex: 1, padding: '13px' }}>Submit Feedback</button>
                 <button type="button" className="btn-ghost" onClick={() => setShowFeedback(false)}>Skip</button>
               </div>
             </form>

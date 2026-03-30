@@ -16,16 +16,19 @@ export default function POSPage() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
 
   useEffect(() => {
     if (business) api.get(`/catalog/${business.id}/items`).then(r => setItems(r.data));
   }, []);
 
+  const categories = ['All', ...Array.from(new Set(items.map(i => i.category_name || 'Other')))];
+
   const addToCart = (item: any) => {
     if (!item.available) return;
     setCart(prev => {
-      const existing = prev.find(c => c.item_id === item.id);
-      if (existing) return prev.map(c => c.item_id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      const ex = prev.find(c => c.item_id === item.id);
+      if (ex) return prev.map(c => c.item_id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
       return [...prev, { item_id: item.id, name: item.name, price: Number(item.price), quantity: 1 }];
     });
   };
@@ -38,7 +41,7 @@ export default function POSPage() {
   };
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const discountAmt = discount.type === 'percent' ? (subtotal * discount.value) / 100 : discount.value;
+  const discountAmt = discount.type === 'percent' ? (subtotal * discount.value) / 100 : Number(discount.value);
   const total = Math.max(0, subtotal - discountAmt);
 
   const placeOrder = async () => {
@@ -59,28 +62,60 @@ export default function POSPage() {
       setCart([]);
       setCustomer({ name: '', phone: '', table: '', notes: '' });
       setDiscount({ type: 'flat', value: 0 });
-      setSuccess('Order placed successfully!');
+      setSuccess('✅ Order placed!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to place order');
     }
   };
 
-  const filtered = items.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = items.filter(i => {
+    const matchCat = activeCategory === 'All' || (i.category_name || 'Other') === activeCategory;
+    const matchSearch = i.name.toLowerCase().includes(filter.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   return (
     <div className="layout">
       <Sidebar />
       <main className="main" style={{ padding: '20px 24px' }}>
         <div className="pos-layout">
-          {/* Item grid */}
-          <div>
-            <input
-              placeholder="Search items..."
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              style={{ marginBottom: 14 }}
-            />
+          {/* Left: item grid */}
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {/* Search */}
+            <div className="search-bar">
+              <span className="search-icon">🔍</span>
+              <input
+                placeholder="Search items..."
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+              />
+            </div>
+
+            {/* Category pills */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: 99,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1.5px solid',
+                    borderColor: activeCategory === cat ? 'var(--orange)' : 'var(--border)',
+                    background: activeCategory === cat ? 'var(--orange)' : '#fff',
+                    color: activeCategory === cat ? '#fff' : 'var(--text-muted)',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             <div className="item-grid">
               {filtered.map(item => (
                 <div
@@ -88,34 +123,49 @@ export default function POSPage() {
                   className={`item-card ${!item.available ? 'unavailable' : ''}`}
                   onClick={() => addToCart(item)}
                 >
-                  <div className="item-cat">{item.category_name || 'Uncategorized'}</div>
+                  <div className="item-cat">{item.category_name || 'Other'}</div>
                   <div className="item-name">{item.name}</div>
-                  <div className="item-price">₹{Number(item.price).toLocaleString()}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="item-price">₹{Number(item.price).toLocaleString()}</div>
+                    {cart.find(c => c.item_id === item.id) && (
+                      <span style={{ background: 'var(--orange)', color: '#fff', borderRadius: 99, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                        {cart.find(c => c.item_id === item.id)?.quantity}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
+              {filtered.length === 0 && (
+                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: 32 }}>🔍</div>
+                  <p style={{ marginTop: 8, fontWeight: 600 }}>No items found</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Cart */}
+          {/* Right: cart */}
           <div className="cart-panel">
-            <h3>Cart {cart.length > 0 && `(${cart.length})`}</h3>
+            <div className="cart-header">
+              <h3>🛒 Order Summary</h3>
+              <p>{cart.length === 0 ? 'Tap items to add' : `${cart.reduce((s,i)=>s+i.quantity,0)} items added`}</p>
+            </div>
 
             <div className="cart-items">
-              {cart.length === 0 && <p style={{ color: '#9ca3af', fontSize: 13 }}>Tap items to add</p>}
               {cart.map(c => (
                 <div key={c.item_id} className="cart-item">
                   <span className="name">{c.name}</span>
                   <button className="qty-btn" onClick={() => updateQty(c.item_id, -1)}>−</button>
-                  <span style={{ minWidth: 20, textAlign: 'center' }}>{c.quantity}</span>
+                  <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700 }}>{c.quantity}</span>
                   <button className="qty-btn" onClick={() => updateQty(c.item_id, 1)}>+</button>
-                  <span style={{ minWidth: 60, textAlign: 'right' }}>₹{(c.price * c.quantity).toLocaleString()}</span>
+                  <span className="item-total">₹{(c.price * c.quantity).toLocaleString()}</span>
                 </div>
               ))}
             </div>
 
             <div className="cart-footer">
               {/* Customer info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 <input placeholder="Customer name" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} />
                 <input placeholder="Phone" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
                 {business?.type === 'restaurant' && (
@@ -125,8 +175,8 @@ export default function POSPage() {
               </div>
 
               {/* Discount */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                <select value={discount.type} onChange={e => setDiscount({ ...discount, type: e.target.value })} style={{ width: 90 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <select value={discount.type} onChange={e => setDiscount({ ...discount, type: e.target.value })} style={{ width: 100 }}>
                   <option value="flat">₹ Flat</option>
                   <option value="percent">% Off</option>
                 </select>
@@ -139,22 +189,27 @@ export default function POSPage() {
               </div>
 
               {/* Payment mode */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              <div className="pay-toggle" style={{ marginBottom: 14 }}>
                 {['cash', 'upi'].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setPayMode(m)}
-                    style={{
-                      flex: 1,
-                      background: payMode === m ? '#4f46e5' : '#f3f4f6',
-                      color: payMode === m ? '#fff' : '#374151',
-                      border: 'none', borderRadius: 6, padding: '7px 0', fontWeight: 600, cursor: 'pointer'
-                    }}
-                  >
-                    {m.toUpperCase()}
+                  <button key={m} className={`pay-btn ${payMode === m ? 'active' : ''}`} onClick={() => setPayMode(m)}>
+                    {m === 'cash' ? '💵 Cash' : '📱 UPI'}
                   </button>
                 ))}
               </div>
+
+              {/* Totals */}
+              {subtotal > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>Subtotal</span><span>₹{subtotal.toLocaleString()}</span>
+                  </div>
+                  {discountAmt > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green)', marginBottom: 4 }}>
+                      <span>Discount</span><span>−₹{discountAmt.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="cart-total">
                 <span>Total</span>
@@ -162,10 +217,14 @@ export default function POSPage() {
               </div>
 
               {error && <p className="error" style={{ marginBottom: 8 }}>{error}</p>}
-              {success && <p style={{ color: '#059669', fontSize: 13, marginBottom: 8 }}>{success}</p>}
+              {success && <p style={{ color: 'var(--green)', fontSize: 13, marginBottom: 8, fontWeight: 600 }}>{success}</p>}
 
-              <button className="btn-primary" style={{ width: '100%' }} onClick={placeOrder}>
-                Place Order
+              <button
+                className="btn-primary"
+                style={{ width: '100%', padding: '13px', fontSize: 15 }}
+                onClick={placeOrder}
+              >
+                Place Order →
               </button>
             </div>
           </div>
