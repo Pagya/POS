@@ -14,6 +14,8 @@ app.use('/orders',     require('./modules/orders/orders.routes'));
 app.use('/feedback',   require('./modules/feedback/feedback.routes'));
 app.use('/dashboard',  require('./modules/dashboard/dashboard.routes'));
 app.use('/public',     require('./modules/public/public.routes'));
+app.use('/customers',  require('./modules/customers/customers.routes'));
+app.use('/analytics',  require('./modules/analytics/analytics.routes'));
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
