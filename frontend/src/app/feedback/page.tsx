@@ -4,128 +4,285 @@ import Sidebar from '@/components/Sidebar';
 import api from '@/lib/api';
 import { getBusiness } from '@/lib/auth';
 
+interface Feedback {
+  id: string;
+  order_id: string;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+interface FeedbackStats {
+  average: number;
+  total: number;
+  feedback: Feedback[];
+  trend: Array<{ date: string; avg_rating: number; count: number }>;
+}
+
 export default function FeedbackPage() {
   const business = typeof window !== 'undefined' ? getBusiness() : null;
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<FeedbackStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [ratingFilter, setRatingFilter] = useState(0);
 
   useEffect(() => {
-    if (business) api.get(`/feedback/${business.id}`).then(r => setData(r.data));
-  }, []);
+    if (!business) return;
+    loadFeedback();
+  }, [business]);
 
-  const stars = (n: number) => Array.from({ length: 5 }, (_, i) => (
-    <span key={i} style={{ color: i < n ? '#FFB800' : '#E0E0E0', fontSize: 16 }}>★</span>
-  ));
+  const loadFeedback = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/feedback/${business.id}`);
+      setData(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load feedback');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const sentimentColor = (rating: number) => rating >= 4 ? 'var(--green)' : rating <= 2 ? 'var(--red)' : '#E65100';
-  const sentimentLabel = (rating: number) => rating >= 4 ? '😊 Positive' : rating <= 2 ? '😞 Negative' : '😐 Neutral';
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getRatingColor = (rating: number) => {
+    if (rating >= 4) return '#60B246';
+    if (rating >= 3) return '#E65100';
+    return '#E02020';
+  };
+
+  const filteredFeedback = data?.feedback.filter((f: Feedback) => ratingFilter === 0 || f.rating === ratingFilter) || [];
+
+  const ratingDistribution = data?.feedback.reduce((acc: { [key: number]: number }, f: Feedback) => {
+    acc[f.rating] = (acc[f.rating] || 0) + 1;
+    return acc;
+  }, {} as { [key: number]: number }) || {};
+
+  if (loading) {
+    return (
+      <div className="layout">
+        <Sidebar />
+        <main className="main">
+          <div className="page-header">
+            <h1 className="page-title">Feedback</h1>
+          </div>
+          <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF' }}>Loading...</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="layout">
       <Sidebar />
       <main className="main">
-        <h1 className="page-title">Feedback Intelligence</h1>
+        <div className="page-header">
+          <h1 className="page-title">Feedback Intelligence</h1>
+        </div>
 
-        {data ? (
-          <>
-            {/* Top stats */}
-            <div className="grid-4" style={{ marginBottom: 24 }}>
-              <div className="card stat-card">
-                <div className="stat-icon">⭐</div>
-                <div className="value" style={{ color: '#FFB800' }}>{data.average_rating ?? '—'}</div>
-                <div className="label">Average Rating</div>
+        {error && (
+          <div style={{ background: '#FEE2E2', color: '#991B1B', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        {data && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {/* Average Rating */}
+            <div className="card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#686B78', marginBottom: 8, textTransform: 'uppercase' }}>
+                Average Rating
               </div>
-              <div className="card stat-card">
-                <div className="stat-icon">📝</div>
-                <div className="value">{data.total_feedback}</div>
-                <div className="label">Total Reviews</div>
+              <div style={{ fontSize: 48, fontWeight: 900, color: getRatingColor(data.average), marginBottom: 4 }}>
+                {data.average.toFixed(1)}
               </div>
-              <div className="card stat-card" style={{ borderLeftColor: 'var(--green)' }}>
-                <div className="stat-icon">😊</div>
-                <div className="value" style={{ color: 'var(--green)' }}>{data.positive_count}</div>
-                <div className="label">Positive (4–5★)</div>
-              </div>
-              <div className="card stat-card" style={{ borderLeftColor: 'var(--red)' }}>
-                <div className="stat-icon">😞</div>
-                <div className="value" style={{ color: 'var(--red)' }}>{data.negative_count}</div>
-                <div className="label">Negative (1–2★)</div>
+              <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+                out of 5 stars
               </div>
             </div>
 
-            <div className="grid-2" style={{ marginBottom: 24, alignItems: 'start' }}>
-              {/* 7-day trend */}
-              <div className="card">
-                <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>📈 7-Day Rating Trend</h2>
-                {data.trend.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Not enough data yet</p>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 80 }}>
-                    {data.trend.map((t: any) => (
-                      <div key={t.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--orange)' }}>{t.avg_rating}</div>
-                        <div style={{
-                          width: '100%', borderRadius: 4,
-                          height: `${(t.avg_rating / 5) * 60}px`,
-                          background: t.avg_rating >= 4 ? 'var(--green)' : t.avg_rating <= 2 ? 'var(--red)' : 'var(--orange)',
-                          minHeight: 4,
-                        }} />
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {/* Total Feedback */}
+            <div className="card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#686B78', marginBottom: 8, textTransform: 'uppercase' }}>
+                Total Feedback
               </div>
-
-              {/* Top keywords */}
-              <div className="card">
-                <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>🔑 Top Keywords</h2>
-                {data.top_keywords.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No comments yet</p>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {data.top_keywords.map((k: any) => (
-                      <span key={k.word} style={{
-                        background: 'var(--orange-light)', color: 'var(--orange)',
-                        padding: '4px 12px', borderRadius: 99, fontWeight: 700,
-                        fontSize: `${Math.min(16, 11 + k.count)}px`,
-                      }}>
-                        {k.word} <span style={{ opacity: .6, fontSize: 11 }}>×{k.count}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div style={{ fontSize: 48, fontWeight: 900, color: '#FC8019', marginBottom: 4 }}>
+                {data.total}
+              </div>
+              <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+                customer reviews
               </div>
             </div>
 
-            {/* Feedback list */}
-            <div className="card">
-              <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>Recent Feedback</h2>
-              {data.feedback.length === 0 && (
-                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No feedback yet. Complete some orders to start collecting ratings.</p>
-              )}
-              {data.feedback.map((f: any) => (
-                <div key={f.id} style={{ padding: '14px 0', borderBottom: '1px solid #F5F5F5', display: 'flex', gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 99, background: 'var(--orange-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                    {f.rating >= 4 ? '😊' : f.rating <= 2 ? '😞' : '😐'}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div>{stars(f.rating)}</div>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: sentimentColor(f.rating), background: sentimentColor(f.rating) + '18', padding: '2px 8px', borderRadius: 99 }}>
-                          {sentimentLabel(f.rating)}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{new Date(f.created_at).toLocaleDateString('en-IN')}</span>
+            {/* 5 Star Count */}
+            <div className="card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#686B78', marginBottom: 8, textTransform: 'uppercase' }}>
+                5 Star Reviews
+              </div>
+              <div style={{ fontSize: 48, fontWeight: 900, color: '#60B246', marginBottom: 4 }}>
+                {ratingDistribution[5] || 0}
+              </div>
+              <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+                {data.total > 0 ? `${Math.round(((ratingDistribution[5] || 0) / data.total) * 100)}%` : '0%'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rating Distribution */}
+        {data && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>Rating Distribution</h2>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {[5, 4, 3, 2, 1].map(rating => {
+                const count = ratingDistribution[rating] || 0;
+                const percentage = data.total > 0 ? (count / data.total) * 100 : 0;
+                return (
+                  <div key={rating} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ minWidth: 40, fontSize: 13, fontWeight: 700, color: '#282C3F' }}>
+                      {rating} ⭐
                     </div>
-                    {f.customer_name && <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{f.customer_name}</div>}
-                    {f.comment && <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{f.comment}</div>}
+                    <div style={{ flex: 1, height: 24, background: '#F0F0F0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          background: getRatingColor(rating),
+                          width: `${percentage}%`,
+                          transition: 'width .3s',
+                        }}
+                      />
+                    </div>
+                    <div style={{ minWidth: 50, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#686B78' }}>
+                      {count} ({Math.round(percentage)}%)
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Filter Buttons */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
+          <button
+            onClick={() => setRatingFilter(0)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 99,
+              fontSize: 13,
+              fontWeight: 700,
+              border: '1.5px solid',
+              background: ratingFilter === 0 ? '#FC8019' : '#fff',
+              color: ratingFilter === 0 ? '#fff' : '#686B78',
+              borderColor: ratingFilter === 0 ? '#FC8019' : '#E9E9EB',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all .15s',
+            }}
+          >
+            All Reviews
+          </button>
+          {[5, 4, 3, 2, 1].map(rating => (
+            <button
+              key={rating}
+              onClick={() => setRatingFilter(rating)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 99,
+                fontSize: 13,
+                fontWeight: 700,
+                border: '1.5px solid',
+                background: ratingFilter === rating ? getRatingColor(rating) : '#fff',
+                color: ratingFilter === rating ? '#fff' : getRatingColor(rating),
+                borderColor: getRatingColor(rating),
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all .15s',
+              }}
+            >
+              {rating} ⭐
+            </button>
+          ))}
+        </div>
+
+        {/* Feedback List */}
+        <div className="card">
+          {filteredFeedback.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#9CA3AF' }}>
+              {data?.feedback.length === 0 ? 'No feedback yet.' : 'No feedback with this rating.'}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {filteredFeedback.map((feedback: Feedback) => (
+                <div
+                  key={feedback.id}
+                  style={{
+                    border: '1.5px solid #E9E9EB',
+                    borderRadius: 10,
+                    padding: 14,
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#282C3F', marginBottom: 4 }}>
+                        {feedback.customer_name || 'Anonymous'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                        {formatDate(feedback.created_at)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 18 }}>
+                      {'⭐'.repeat(feedback.rating)}
+                    </div>
+                  </div>
+
+                  {feedback.comment && (
+                    <div style={{
+                      background: '#F9F9F9',
+                      padding: 12,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      color: '#282C3F',
+                      lineHeight: 1.6,
+                      fontStyle: 'italic',
+                    }}>
+                      "{feedback.comment}"
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 7-Day Trend */}
+        {data?.trend && data.trend.length > 0 && (
+          <div className="card" style={{ marginTop: 24 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>7-Day Trend</h2>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {data.trend.map((day: { date: string; avg_rating: number; count: number }, idx: number) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ minWidth: 80, fontSize: 13, fontWeight: 600, color: '#686B78' }}>
+                    {new Date(day.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: getRatingColor(day.avg_rating) }}>
+                      {day.avg_rating.toFixed(1)} ⭐
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                      ({day.count} review{day.count !== 1 ? 's' : ''})
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </>
-        ) : (
-          <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+          </div>
         )}
       </main>
     </div>
