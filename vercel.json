@@ -1,3 +1,13 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "env": {
+    "DATABASE_URL": "postgresql://postgres:Batu10caves%40@db.eubxpoptnqrecarsyxsr.supabase.co:5432/postgres",
+    "JWT_SECRET": "commerce_os_jwt_secret_2025"
+  },
+  "build": {
+    "env": {
+      "DATABASE_URL": "postgresql://postgres:Batu10caves%40@db.eubxpoptnqrecarsyxsr.supabase.co:5432/postgres",
+      "JWT_SECRET": "commerce_os_jwt_secret_2025"
+    }
+  }
 }

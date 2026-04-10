@@ -2,8 +2,11 @@ import { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '@/lib/db';
+import { runMigrationOnce } from '@/lib/runMigration';
 
 export async function POST(req: NextRequest) {
+  await runMigrationOnce();
+
   const { name, email, password } = await req.json();
   if (!name || !email || !password)
     return Response.json({ error: 'name, email, password required' }, { status: 400 });
