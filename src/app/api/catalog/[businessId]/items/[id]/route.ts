@@ -12,34 +12,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { businessId
   if (!user) return unauthorized();
   if (!(await ownsBusiness(user.userId, params.businessId))) return forbidden();
 
-  const { name, price, type, category_id, available } = await req.json();
-
+  const body = await req.json();
+  const fields = ['name', 'price', 'type', 'category_id', 'available'];
   const updates: string[] = [];
   const values: any[] = [];
-  let idx = 1;
+  let i = 1;
 
-  if (name !== undefined) { updates.push(`name=$${idx++}`); values.push(name); }
-  if (price !== undefined) { updates.push(`price=$${idx++}`); values.push(price); }
-  if (type !== undefined) { updates.push(`type=$${idx++}`); values.push(type); }
-  if (category_id !== undefined) { updates.push(`category_id=$${idx++}`); values.push(category_id); }
-  if (available !== undefined) { updates.push(`available=$${idx++}`); values.push(available); }
-
-  if (updates.length === 0) {
-    return Response.json({ error: 'No fields to update' }, { status: 400 });
+  for (const f of fields) {
+    if (body[f] !== undefined) {
+      updates.push(`${f}=$${i++}`);
+      values.push(body[f]);
+    }
   }
+  if (!updates.length) return Response.json({ error: 'Nothing to update' }, { status: 400 });
 
-  values.push(params.id);
-  values.push(params.businessId);
-
+  values.push(params.id, params.businessId);
   const { rows } = await query(
-    `UPDATE items SET ${updates.join(', ')} WHERE id=$${idx++} AND business_id=$${idx++} RETURNING *`,
+    `UPDATE items SET ${updates.join(',')} WHERE id=$${i++} AND business_id=$${i} RETURNING *`,
     values
   );
-
-  if (rows.length === 0) {
-    return Response.json({ error: 'Item not found' }, { status: 404 });
-  }
-
+  if (!rows.length) return Response.json({ error: 'Item not found' }, { status: 404 });
   return Response.json(rows[0]);
 }
 
@@ -48,14 +40,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { businessI
   if (!user) return unauthorized();
   if (!(await ownsBusiness(user.userId, params.businessId))) return forbidden();
 
-  const { rows } = await query(
-    'DELETE FROM items WHERE id=$1 AND business_id=$2 RETURNING id',
-    [params.id, params.businessId]
-  );
-
-  if (rows.length === 0) {
-    return Response.json({ error: 'Item not found' }, { status: 404 });
-  }
-
+  await query('DELETE FROM items WHERE id=$1 AND business_id=$2', [params.id, params.businessId]);
   return Response.json({ success: true });
 }

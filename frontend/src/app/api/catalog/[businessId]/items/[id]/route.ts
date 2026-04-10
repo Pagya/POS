@@ -19,7 +19,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { businessId
   let i = 1;
 
   for (const f of fields) {
-    if (body[f] !== undefined) { updates.push(`${f}=$${i++}`); values.push(body[f]); }
+    if (body[f] !== undefined) {
+      updates.push(`${f}=$${i++}`);
+      values.push(body[f]);
+    }
   }
   if (!updates.length) return Response.json({ error: 'Nothing to update' }, { status: 400 });
 

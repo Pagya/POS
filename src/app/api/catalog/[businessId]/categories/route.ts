@@ -8,10 +8,11 @@ async function ownsBusiness(userId: string, businessId: string) {
 }
 
 export async function GET(req: NextRequest, { params }: { params: { businessId: string } }) {
-  const { rows } = await query(
-    'SELECT id, name FROM categories WHERE business_id=$1 ORDER BY name',
-    [params.businessId]
-  );
+  const user = getUser(req);
+  if (!user) return unauthorized();
+  if (!(await ownsBusiness(user.userId, params.businessId))) return forbidden();
+
+  const { rows } = await query('SELECT * FROM categories WHERE business_id=$1 ORDER BY name', [params.businessId]);
   return Response.json(rows);
 }
 

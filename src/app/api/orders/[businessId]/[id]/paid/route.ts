@@ -12,13 +12,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { businessId
   if (!user) return unauthorized();
   if (!(await ownsBusiness(user.userId, params.businessId))) return forbidden();
 
-  const { status } = await req.json();
-  const valid = ['new', 'processing', 'completed', 'cancelled'];
-  if (!valid.includes(status)) return Response.json({ error: 'Invalid status' }, { status: 400 });
-
   const { rows } = await query(
-    'UPDATE orders SET status=$1 WHERE id=$2 AND business_id=$3 RETURNING *',
-    [status, params.id, params.businessId]
+    'UPDATE orders SET paid=true WHERE id=$1 AND business_id=$2 RETURNING *',
+    [params.id, params.businessId]
   );
   if (!rows.length) return Response.json({ error: 'Not found' }, { status: 404 });
   return Response.json(rows[0]);
