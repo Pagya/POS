@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
-  // API routes are now built-in — no external backend needed
+const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['pg', 'bcryptjs'],
+  },
 };
+
+module.exports = nextConfig;
