@@ -13,8 +13,8 @@ interface Item {
   id: string;
   name: string;
   price: number;
-  category_id: string;
-  category_name: string;
+  category_id: string | null;
+  category_name: string | null;
   available: boolean;
   type: string;
 }
