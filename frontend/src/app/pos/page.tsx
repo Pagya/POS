@@ -1,10 +1,19 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Sidebar from '@/components/Sidebar';
+import VariantSelector from '@/components/VariantSelector';
 import api from '@/lib/api';
 import { getBusiness } from '@/lib/auth';
 
-interface CartItem { item_id: string; name: string; price: number; quantity: number; item_discount: number; }
+interface CartItem {
+  item_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  item_discount: number;
+  variant_label?: string;
+  variant_option_ids?: string[];
+}
 
 export default function POSPage() {
   const business = typeof window !== 'undefined' ? getBusiness() : null;
@@ -20,13 +29,32 @@ export default function POSPage() {
   const [filter, setFilter] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [recentItems, setRecentItems] = useState<string[]>([]);
+  const [variantItem, setVariantItem] = useState<any | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const isRestaurant = business?.type === 'restaurant';
   const isService = business?.type === 'service';
 
   useEffect(() => {
-    if (business) api.get(`/catalog/${business.id}/items`).then(r => setItems(r.data));
+    if (business) {
+      api.get(`/catalog/${business.id}/items`).then(async (r) => {
+        const loadedItems = r.data;
+        // Fetch primary image for each item
+        const itemsWithImages = await Promise.all(
+          loadedItems.map(async (item: any) => {
+            try {
+              const imgRes = await api.get(`/api/items/${item.id}/images`);
+              const images = imgRes.data?.data || imgRes.data || [];
+              const primaryImage = images.find((img: any) => img.is_primary);
+              return { ...item, primary_image_url: primaryImage?.url || null };
+            } catch {
+              return { ...item, primary_image_url: null };
+            }
+          })
+        );
+        setItems(itemsWithImages);
+      });
+    }
   }, []);
 
   // Keyboard shortcuts
@@ -61,6 +89,35 @@ export default function POSPage() {
     });
     setRecentItems(prev => [item.id, ...prev.filter(id => id !== item.id)].slice(0, 8));
     setFilter('');
+  };
+
+  const handleItemClick = async (item: any) => {
+    if (!item.available) return;
+    // Lazy-load variant groups for the clicked item
+    try {
+      const res = await api.get(`/api/items/${item.id}/variant-groups`);
+      const variantGroups = res.data?.data || res.data || [];
+      if (variantGroups.length > 0) {
+        // Fetch options for each group
+        const groupsWithOptions = await Promise.all(
+          variantGroups.map(async (group: any) => {
+            try {
+              const optRes = await api.get(`/api/items/${item.id}/variant-groups/${group.id}/options`);
+              const options = optRes.data?.data || optRes.data || [];
+              return { ...group, options };
+            } catch {
+              return { ...group, options: [] };
+            }
+          })
+        );
+        setVariantItem({ ...item, variant_groups: groupsWithOptions });
+      } else {
+        addToCart(item);
+      }
+    } catch {
+      // If fetching variant groups fails, add directly
+      addToCart(item);
+    }
   };
 
   const updateQty = (item_id: string, delta: number) => {
@@ -138,7 +195,18 @@ export default function POSPage() {
 
             <div className="item-grid">
               {filtered.map(item => (
-                <div key={item.id} className={`item-card ${!item.available ? 'unavailable' : ''}`} onClick={() => addToCart(item)}>
+                <div key={item.id} className={`item-card ${!item.available ? 'unavailable' : ''}`} onClick={() => handleItemClick(item)}>
+                  {item.primary_image_url ? (
+                    <img
+                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${item.primary_image_url}`}
+                      alt={item.name}
+                      style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
+                    />
+                  ) : (
+                    <div style={{ width: '100%', height: 80, borderRadius: 8, marginBottom: 8, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#ccc' }}>
+                      📷
+                    </div>
+                  )}
                   <div className="item-cat">{item.category_name || 'Other'}</div>
                   <div className="item-name">{item.name}</div>
                   {isService && item.duration_minutes && (
@@ -206,9 +274,10 @@ export default function POSPage() {
             <div className="cart-items">
               {cart.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>Cart is empty</p>}
               {cart.map(c => (
-                <div key={c.item_id} className="cart-item">
+                <div key={c.item_id + (c.variant_option_ids?.join(',') || '')} className="cart-item">
                   <div style={{ flex: 1 }}>
                     <div className="name">{c.name}</div>
+                    {c.variant_label && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{c.variant_label}</div>}
                     {c.item_discount > 0 && <div style={{ fontSize: 11, color: 'var(--green)' }}>−₹{c.item_discount} off</div>}
                   </div>
                   <button className="qty-btn" onClick={() => updateQty(c.item_id, -1)}>−</button>
@@ -270,6 +339,29 @@ export default function POSPage() {
             </div>
           </div>
         </div>
+
+        {/* Variant Selector Modal */}
+        {variantItem && (
+          <VariantSelector
+            item={variantItem}
+            variantGroups={variantItem.variant_groups}
+            onConfirm={(selections, resolvedPrice) => {
+              const label = selections.map(s => `${s.groupName}: ${s.label}`).join(', ');
+              setCart(prev => [...prev, {
+                item_id: variantItem.id,
+                name: variantItem.name,
+                price: resolvedPrice,
+                quantity: 1,
+                item_discount: 0,
+                variant_label: label,
+                variant_option_ids: selections.map(s => s.optionId),
+              }]);
+              setRecentItems(prev => [variantItem.id, ...prev.filter(id => id !== variantItem.id)].slice(0, 8));
+              setVariantItem(null);
+            }}
+            onClose={() => setVariantItem(null)}
+          />
+        )}
       </main>
     </div>
   );

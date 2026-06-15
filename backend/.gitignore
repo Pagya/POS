@@ -1,0 +1,8 @@
+node_modules
+.env
+
+# Uploaded files (keep directory structure via .gitkeep)
+uploads/*
+!uploads/items/
+uploads/items/*
+!uploads/items/.gitkeep

@@ -63,6 +63,8 @@ router.post('/:businessId', async (req, res) => {
     price: itemMap[i.item_id].price,
     name: itemMap[i.item_id].name,
     discount: i.discount || 0,
+    variant_label: i.variant_label || null,
+    variant_option_ids: i.variant_option_ids || null,
   }));
 
   const { subtotal, taxAmount, total } = calcBill(enriched, discount_type, discount_value, effectiveTaxRate);
@@ -80,8 +82,8 @@ router.post('/:businessId', async (req, res) => {
 
     for (const item of enriched) {
       await query(
-        'INSERT INTO order_items (order_id, item_id, name, price, quantity, discount) VALUES ($1,$2,$3,$4,$5,$6)',
-        [order.id, item.item_id, item.name, item.price, item.quantity, item.discount]
+        'INSERT INTO order_items (order_id, item_id, name, price, quantity, discount, variant_label, variant_option_ids) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [order.id, item.item_id, item.name, item.price, item.quantity, item.discount, item.variant_label, item.variant_option_ids]
       );
     }
     res.status(201).json(order);
