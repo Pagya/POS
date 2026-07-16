@@ -25,5 +25,10 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Commerce OS API running on :${PORT}`));
+// Export for Vercel serverless; also listen for local dev
+if (require.main === module) {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => console.log(`Commerce OS API running on :${PORT}`));
+}
+
+module.exports = app;
