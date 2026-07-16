@@ -1,3 +1,4 @@
+// v3 - fixed build
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import api from '@/lib/api';

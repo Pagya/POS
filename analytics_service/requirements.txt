@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+asyncpg
+prophet
+openai
+cachetools
+bleach
+pandas
+hypothesis
+pytest
+pytest-asyncio
+httpx
+statsmodels
+pydantic-settings

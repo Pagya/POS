@@ -48,17 +48,17 @@ router.get('/:businessId', authMiddleware, async (req, res) => {
 
   // keyword frequency from comments (simple word count)
   const stopWords = new Set(['the','a','an','is','it','was','and','or','but','in','on','at','to','for','of','with','this','that','i','my','we','our','your','very','so','not','no','yes','good','bad']);
-  const wordFreq: Record<string, number> = {};
-  feedback.forEach((f: any) => {
+  const wordFreq = {};
+  feedback.forEach((f) => {
     if (!f.comment) return;
-    f.comment.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).forEach((w: string) => {
+    f.comment.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).forEach((w) => {
       if (w.length > 2 && !stopWords.has(w)) wordFreq[w] = (wordFreq[w] || 0) + 1;
     });
   });
   const topKeywords = Object.entries(wordFreq).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([word, count]) => ({ word, count }));
 
-  const positive = feedback.filter((f: any) => f.rating >= 4);
-  const negative = feedback.filter((f: any) => f.rating <= 2);
+  const positive = feedback.filter((f) => f.rating >= 4);
+  const negative = feedback.filter((f) => f.rating <= 2);
 
   res.json({
     average_rating: avgRow.rows[0].average,

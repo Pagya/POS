@@ -85,7 +85,7 @@ export default function FeedbackPage() {
                     {data.top_keywords.map((k: any) => (
                       <span key={k.word} style={{
                         background: 'var(--orange-light)', color: 'var(--orange)',
-                        padding: '4px 12px', borderRadius: 99, fontSize: 13, fontWeight: 700,
+                        padding: '4px 12px', borderRadius: 99, fontWeight: 700,
                         fontSize: `${Math.min(16, 11 + k.count)}px`,
                       }}>
                         {k.word} <span style={{ opacity: .6, fontSize: 11 }}>×{k.count}</span>

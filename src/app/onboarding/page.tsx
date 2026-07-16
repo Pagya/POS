@@ -24,7 +24,12 @@ export default function OnboardingPage() {
     setLoading(true);
     try {
       const { data } = await api.post('/businesses', { name, type });
-      const token = localStorage.getItem('token')!;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('You need to sign up first. Redirecting to login...');
+        setTimeout(() => router.push('/login'), 1500);
+        return;
+      }
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       setSession(token, user, data);
       router.push('/dashboard');
